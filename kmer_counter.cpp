@@ -117,6 +117,8 @@ std::ostream& operator << (std::ostream& o, FixedString& str)
 typedef tbb::concurrent_hash_map<string,int,MyHashCompare> StringTable;
 StringTable results;
 
+map<string, map<string, tbb::concurrent_hash_map<string,int,MyHashCompare>>> more;
+
 //User defined options struct
 struct ModifyStringOptions
 {
@@ -126,6 +128,7 @@ struct ModifyStringOptions
 	int klen;
 	CharString type;
 	int markovOrder;
+	int prefix;
 };
 
 //Parse our commandline options
@@ -138,6 +141,8 @@ seqan::ArgumentParser::ParseResult parseCommandLine(ModifyStringOptions & option
 	setRequired(parser, "output-file");
 	addOption(parser, seqan::ArgParseOption("k", "klen", "K-Mer Size.", seqan::ArgParseArgument::INTEGER, "INT"));
         setDefaultValue(parser, "klen", "3");
+	addOption(parser, seqan::ArgParseOption("p", "prefix", "Prefix Size.", seqan::ArgParseArgument::INTEGER, "INT"));
+        setDefaultValue(parser, "prefix", "3");
 	setShortDescription(parser, "Alignment-free sequence comparison.");
 	setVersion(parser, "0.0.1");
 	setDate(parser, "February 2017");
@@ -154,6 +159,7 @@ seqan::ArgumentParser::ParseResult parseCommandLine(ModifyStringOptions & option
 	getOptionValue(options.queryFileName, parser, "query-file");
 	getOptionValue(options.outputFileName, parser, "output-file");
 	getOptionValue(options.klen, parser, "klen");
+	getOptionValue(options.prefix, parser, "prefix");
 
 	return seqan::ArgumentParser::PARSE_OK;
 }
@@ -179,10 +185,26 @@ void count(IupacString sequence, int klen)
         }
 }
 
-void loopcount(int klen, int i, IupacString sequence)
+void loopcount(int klen, int i, IupacString sequence, int prefixsize, int prefix2size)
 {
 	string kmer;
+	//assign(kmer,infix(sequence, i+prefixsize+prefix2size, i+klen));
 	assign(kmer,infix(sequence, i, i+klen));
+
+	string prefix;
+	assign(prefix,infix(sequence, i, i+prefixsize));
+
+	string prefix2;
+        assign(prefix2,infix(sequence, i+prefixsize, i+prefixsize+prefix2size));
+
+	//m.lock();
+	//cout << prefix << " " << prefix2 << " " << kmer<< endl;
+	//m.unlock();
+
+	//map/map/concurrent map example
+	//StringTable::accessor a;
+	//more[prefix][prefix2].insert(a,kmer);
+	//a->second += 1;
 
 	//this allows us to make the FixedString from a string
 	//FixedString fs;
@@ -196,17 +218,19 @@ void loopcount(int klen, int i, IupacString sequence)
 	//myFixedMap[fs]++;
 	//m.unlock();
 
+
+
 	StringTable::accessor a;
 	results.insert( a, kmer );
 	a->second += 1;
 }
 
-void applyloop(IupacString sequence, int klen)
+void applyloop(IupacString sequence, int klen, int prefixsize, int prefix2size)
 {
 	int size = length(sequence)-klen;
 	tbb::parallel_for(0, size, 1, [=](int i)
 	{
-		loopcount(klen, i, sequence);
+		loopcount(klen, i, sequence, prefixsize, prefix2size);
 	});
 }
 
@@ -228,16 +252,20 @@ int main(int argc, char const ** argv)
 		return 1;
 	}
 
-	readRecords(queryids, queryseqs, queryFileIn);
-	
-	int size = length(queryseqs);
-	tbb::parallel_for( 0, size , 1, [=](int i)
-	{
-		applyloop(queryseqs[i], options.klen);
-	});
+	int counter = 0;
 
-	ofstream outfile;
-	outfile.open(toCString(options.outputFileName));
+	while(!atEnd(queryFileIn))
+	{
+		cout << "Processing batch " << counter*10000 << " " << (counter*10000)+10000 << " size " << more.size() << " " << more["AAAA"].size() << " " << more["AAAA"]["AAAA"].size() << " " << results.size() << endl;
+		counter++;
+
+		readRecords(queryids, queryseqs, queryFileIn);
+	
+		int size = length(queryseqs);
+		tbb::parallel_for( 0, size , 1, [=](int i)
+		{
+			applyloop(queryseqs[i], options.klen, options.prefix, 4);
+		});
 
 /*
 	//This is if you wanted to output the contents of the STXXL map to file.
@@ -249,9 +277,18 @@ int main(int argc, char const ** argv)
 	}
 */
 
+	}
+
+	ofstream outfile;
+        outfile.open(toCString(options.outputFileName));
+
 	for(auto it : results)
 		outfile << it.first << " " << it.second << endl;
-
+/*	for(auto it : more)
+		for(auto im : it.second)
+			for(auto ip : im.second)
+				outfile << it.first << " " << im.first << " " << ip.first << " " << ip.second << endl;
+*/
 	outfile.close();
 
 	return 0;
