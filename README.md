@@ -7,9 +7,9 @@ Simple concurrent K-Mer counter using TBB (and STXXL but not really used in the 
 sudo apt-get install git g++ build-essential cmake zlib1g-dev libbz2-dev libboost-all-dev libtbb-dev libstxxl-dev
 git clone https://github.com/seqan/seqan.git seqan
 git clone https://github.com/martinjvickers/kmer_counter.git
-cd alfsc
+cd kmer_counter
 cmake ../kmer_counter -DCMAKE_MODULE_PATH=../seqan/util/cmake -DSEQAN_INCLUDE_PATH=../seqan/include -DCMAKE_CXX_FLAGS=-std=c++14 -DCMAKE_BUILD_TYPE=Release
-./make.sh
+make -j4
 ```
 
 ### Quick run test ###
