@@ -25,9 +25,8 @@ include_directories (${SEQAN_INCLUDE_DIRS})
 add_definitions (${SEQAN_DEFINITIONS})
 
 # Add CXX flags found by find_package (SeqAn).
-set (CMAKE_CXX_FLAGS  "-static ${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS} -Wl,--whole-archive -lpthread -Wl,-no-whole-archive")
-#set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS} -lpthread -ltbb")
+set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS}")
 
 # Add executable and link against SeqAn dependencies.
 add_executable (kmer_counter kmer_counter.cpp)
-target_link_libraries (kmer_counter ${SEQAN_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (kmer_counter -ltbb ${SEQAN_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
