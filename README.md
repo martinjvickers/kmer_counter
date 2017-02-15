@@ -12,8 +12,6 @@ cmake ../kmer_counter -DCMAKE_MODULE_PATH=../seqan/util/cmake -DSEQAN_INCLUDE_PA
 ./make.sh
 ```
 
-Don't worry about the initial tbb errors. The ./make.sh script reruns the linker after the regular make -j4 command which produces the errors. Once I figure out how to append ltbb to the end of the make file this will disappear.
-
 ### Quick run test ###
 
 This took just under 4 mins and 40GB of ram on an AWS 32core 240GB Ubuntu 16.4 instance to calculate k=55 for 1GB compressed fastq file with approx 16million reads.
