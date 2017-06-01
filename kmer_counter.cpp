@@ -22,15 +22,8 @@
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tbb_allocator.h"
 
-#include <stxxl.h>
-
 using namespace seqan;
 using namespace std;
-
-static const int MAX_KEY_LEN = 100;
-
-#define DATA_NODE_BLOCK_SIZE (4096)
-#define DATA_LEAF_BLOCK_SIZE (4096)
 
 mutex m; //read query mutex
 mutex n; //write to console mutex
@@ -40,6 +33,7 @@ SeqFileIn queryFileIn;
 StringSet<IupacString> queryseqs;
 StringSet<CharString> queryids;
 
+/*
 //needed for concurrent map
 struct MyHashCompare {
     static size_t hash( const string& x ) {
@@ -50,6 +44,19 @@ struct MyHashCompare {
     }
     //! True if strings are equal
     static bool equal( const string& x, const string& y ) {
+        return x==y;
+    }
+};
+*/
+struct MyHashCompare {
+    static size_t hash( const Dna5String& x ) {
+        size_t h = 0;
+	for(int i = 0; i < length(x); i++)
+		h =(h*17)^(char)x[i];
+        return h;
+    }
+    //! True if strings are equal
+    static bool equal( const Dna5String& x, const Dna5String& y ) {
         return x==y;
     }
 };
@@ -108,13 +115,9 @@ std::ostream& operator << (std::ostream& o, FixedString& str)
 	return o;
 }
 
-//STXXL method
-//typedef stxxl::map<FixedString, unsigned int, comp_type, DATA_NODE_BLOCK_SIZE, DATA_LEAF_BLOCK_SIZE> fixed_name_map;
-//fixed_name_map myFixedMap((fixed_name_map::node_block_type::raw_size)*5, (fixed_name_map::leaf_block_type::raw_size)*5);
-
-
 //TBB method which works but uses all your ram!
-typedef tbb::concurrent_hash_map<string,int,MyHashCompare> StringTable;
+//typedef tbb::concurrent_hash_map<string,int,MyHashCompare> StringTable;
+typedef tbb::concurrent_hash_map<Dna5String,int,MyHashCompare> StringTable;
 StringTable results;
 
 map<string, map<string, tbb::concurrent_hash_map<string,int,MyHashCompare>>> more;
@@ -166,7 +169,7 @@ seqan::ArgumentParser::ParseResult parseCommandLine(ModifyStringOptions & option
 
 void count(IupacString sequence, int klen)
 {
-        int total = 0;
+        //int total = 0;
         //iterate over the sequence
         for(int i = 0; i <= length(sequence)-klen; i++)
         {
@@ -190,13 +193,13 @@ void loopcount(int klen, int i, IupacString sequence, int prefixsize, int prefix
 	string kmer;
 	//assign(kmer,infix(sequence, i+prefixsize+prefix2size, i+klen));
 	assign(kmer,infix(sequence, i, i+klen));
-
+/*
 	string prefix;
 	assign(prefix,infix(sequence, i, i+prefixsize));
 
 	string prefix2;
         assign(prefix2,infix(sequence, i+prefixsize, i+prefixsize+prefix2size));
-
+*/
 	//m.lock();
 	//cout << prefix << " " << prefix2 << " " << kmer<< endl;
 	//m.unlock();
@@ -218,14 +221,15 @@ void loopcount(int klen, int i, IupacString sequence, int prefixsize, int prefix
 	//myFixedMap[fs]++;
 	//m.unlock();
 
-
-
-	StringTable::accessor a;
-	results.insert( a, kmer );
-	a->second += 1;
+	size_t found = kmer.find("N");
+	if(found > kmer.size()){
+		StringTable::accessor a;
+		results.insert( a, kmer );
+		a->second += 1;
+	}
 }
 
-void applyloop(IupacString sequence, int klen, int prefixsize, int prefix2size)
+void applyloop(IupacString &sequence, int klen, int prefixsize, int prefix2size)
 {
 	int size = length(sequence)-klen;
 	tbb::parallel_for(0, size, 1, [=](int i)
@@ -256,31 +260,18 @@ int main(int argc, char const ** argv)
 
 	while(!atEnd(queryFileIn))
 	{
-		cout << "Processing batch " << counter*10000 << " " << (counter*10000)+10000 << " size " << more.size() << " " << more["AAAA"].size() << " " << more["AAAA"]["AAAA"].size() << " " << results.size() << endl;
-		counter++;
-
 		readRecords(queryids, queryseqs, queryFileIn);
 	
 		int size = length(queryseqs);
 		tbb::parallel_for( 0, size , 1, [=](int i)
 		{
 			applyloop(queryseqs[i], options.klen, options.prefix, 4);
+			//count(queryseqs[i], options.klen);
 		});
-
-/*
-	//This is if you wanted to output the contents of the STXXL map to file.
-
-	fixed_name_map::iterator iter;
-	for (iter = myFixedMap.begin(); iter != myFixedMap.end(); ++iter)
-	{
-		outfile << (FixedString&)iter->first << " " << iter->second << endl;
-	}
-*/
-
 	}
 
 	ofstream outfile;
-        outfile.open(toCString(options.outputFileName));
+        outfile.open(toCString(options.outputFileName), ios::binary);
 
 	for(auto it : results)
 		outfile << it.first << " " << it.second << endl;
