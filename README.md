@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/martinjvickers/kmer_counter.svg?branch=master)](https://travis-ci.org/martinjvickers/kmer_counter)
+
 ### Quick summary ###
 Simple concurrent K-Mer counter using TBB (and STXXL but not really used in the example as it's not concurrent).
 
