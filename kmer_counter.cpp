@@ -33,21 +33,6 @@ SeqFileIn queryFileIn;
 StringSet<IupacString> queryseqs;
 StringSet<CharString> queryids;
 
-/*
-//needed for concurrent map
-struct MyHashCompare {
-    static size_t hash( const string& x ) {
-        size_t h = 0;
-        for( const char* s = x.c_str(); *s; ++s )
-            h = (h*17)^*s;
-        return h;
-    }
-    //! True if strings are equal
-    static bool equal( const string& x, const string& y ) {
-        return x==y;
-    }
-};
-*/
 struct MyHashCompare {
     static size_t hash( const Dna5String& x ) {
         size_t h = 0;
@@ -61,62 +46,7 @@ struct MyHashCompare {
     }
 };
 
-//until the next comment this is all for the STXXL map which we're not using.
-struct CompareGreater
-{
-	bool operator () (const int & a, const int & b) const
-	{
-		return a>b;
-	}
-
-	static unsigned int max_value()
-	{
-		return std::numeric_limits<unsigned int>::min();
-	}
-};
-
-class FixedString { 
-public:
-    char charStr[MAX_KEY_LEN];
-
-    bool operator< (const FixedString& fixedString) const {
-        return std::lexicographical_compare(charStr, charStr+MAX_KEY_LEN,
-            fixedString.charStr, fixedString.charStr+MAX_KEY_LEN);
-    }
-
-    bool operator==(const FixedString& fixedString) const {
-        return std::equal(charStr, charStr+MAX_KEY_LEN, fixedString.charStr);
-    }
-
-    bool operator!=(const FixedString& fixedString) const {
-        return !std::equal(charStr, charStr+MAX_KEY_LEN, fixedString.charStr);
-    } 
-};
-
-struct comp_type : public std::less<FixedString> {
-    static FixedString max_value()
-    {
-        FixedString s;
-        std::fill(s.charStr, s.charStr+MAX_KEY_LEN, 0x7f);
-        return s;
-    }
-
-};
-
-std::istream& operator >> (std::istream& i, FixedString& str)
-{
-	i >> str.charStr;
-	return i;
-}
-
-std::ostream& operator << (std::ostream& o, FixedString& str)
-{
-	o << str.charStr;
-	return o;
-}
-
 //TBB method which works but uses all your ram!
-//typedef tbb::concurrent_hash_map<string,int,MyHashCompare> StringTable;
 typedef tbb::concurrent_hash_map<Dna5String,int,MyHashCompare> StringTable;
 StringTable results;
 
@@ -265,8 +195,8 @@ int main(int argc, char const ** argv)
 		int size = length(queryseqs);
 		tbb::parallel_for( 0, size , 1, [=](int i)
 		{
-			applyloop(queryseqs[i], options.klen, options.prefix, 4);
-			//count(queryseqs[i], options.klen);
+			//applyloop(queryseqs[i], options.klen, options.prefix, 4);
+			count(queryseqs[i], options.klen);
 		});
 	}
 
@@ -275,11 +205,7 @@ int main(int argc, char const ** argv)
 
 	for(auto it : results)
 		outfile << it.first << " " << it.second << endl;
-/*	for(auto it : more)
-		for(auto im : it.second)
-			for(auto ip : im.second)
-				outfile << it.first << " " << im.first << " " << ip.first << " " << ip.second << endl;
-*/
+
 	outfile.close();
 
 	return 0;
